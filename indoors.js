@@ -2,31 +2,32 @@
 
 const axios = require('axios')
 
-function getEvents(axios, name) {
+const meetupUrlName = "Silicon-Throwabout";
+const eventName = "Tuesday Indoors (Ultimate Frisbee)";
+
+function getEvents(axios, meetupUrlName, eventName) {
   return axios({
     method: 'get',
-    url: `https://api.meetup.com/Silicon-Throwabout/events/`,
+    url: `https://api.meetup.com/${meetupUrlName}/events/`,
     headers: { 'Accept': 'application/json' },
-  }).then(res => {
-    return res.data.filter(e => {
-      return e.name === name;
+  }).then(response => {
+    return response.data.filter(e => {
+      return e.name === eventName;
     });
   }).catch(err => {
     console.log(err);
   })
 }
 
-function getAttendees(axios, eventId) {
+function getAttendees(axios, meetupUrlName, eventId) {
   return axios({
     method: 'get',
-    url: `https://api.meetup.com/Silicon-Throwabout/events/${eventId}/rsvps`,
+    url: `https://api.meetup.com/${meetupUrlName}/events/${eventId}/rsvps`,
     headers: { 'Accept': 'application/json' },
-  }).then(res => {
-    return res.data.filter(element => {
-      return element.response === "yes";
-    }).map(element => {
-      return element.member.name;
-    });
+  }).then(response => {
+    return response.data
+      .filter(element => element.response === "yes")
+      .map(element => element.member.name);
   }).catch(err => {
     console.log(err);
   })
@@ -34,21 +35,23 @@ function getAttendees(axios, eventId) {
 
 output = {};
 
-getEvents(axios, "Tuesday Indoors (Ultimate Frisbee)").then(events => {
-  events.forEach(event => {
-    output[event.local_date] = {
-      count: 0,
-      // attendeees: [],
+getEvents(axios, meetupUrlName, eventName).then(events => {
+  return Promise.all(events.map(event => {
+    output[event.id] = {
+      eventData: event,
+      attendeeNames: [],
     };
-    getAttendees(axios, event.id).then(attendees => {
+    attendeePromise = getAttendees(axios, meetupUrlName, event.id);
+    attendeePromise.then(attendees => {
       attendees.forEach(attendee => {
-        output[event.local_date].count++;
-        // output[event.local_date].attendeees.push(attendee);
+        output[event.id].attendeeNames.push(attendee);
       });
     });
+    return attendeePromise;
+  }));
+}).then(() => {
+  Object.keys(output).forEach(function (key) {
+    info = output[key];
+    console.log(`${info.eventData.local_date}: ${info.attendeeNames.length} (${info.attendeeNames.join(",")})`)
   });
 });
-
-setTimeout(() => console.log(output), 10000);
-
-
