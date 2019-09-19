@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const axios = require('axios')
+const dateFormat = require('dateformat');
 
 const meetupUrlName = "Silicon-Throwabout";
 const eventName = "Tuesday Indoors (Ultimate Frisbee)";
@@ -33,7 +34,7 @@ function getAttendees(axios, meetupUrlName, eventId) {
   })
 }
 
-output = {};
+let output = {};
 
 getEvents(axios, meetupUrlName, eventName).then(events => {
   return Promise.all(events.map(event => {
@@ -41,7 +42,7 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
       eventData: event,
       attendeeNames: [],
     };
-    attendeePromise = getAttendees(axios, meetupUrlName, event.id);
+    let attendeePromise = getAttendees(axios, meetupUrlName, event.id);
     attendeePromise.then(attendees => {
       attendees.forEach(attendee => {
         output[event.id].attendeeNames.push(attendee);
@@ -51,7 +52,10 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
   }));
 }).then(() => {
   Object.keys(output).forEach(function (key) {
-    info = output[key];
-    console.log(`${info.eventData.local_date}: ${info.attendeeNames.length} (${info.attendeeNames.join(",")})`)
+    let info = output[key];
+    let date = info.eventData.local_date;
+    let attendeeCount = info.attendeeNames.length;
+    let attendees = info.attendeeNames.join(", ");
+    console.log(`${dateFormat(date, "d mmm")}: ${18 - attendeeCount} spaces left - (${attendees})`);
   });
 });
