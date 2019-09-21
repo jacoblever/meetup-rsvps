@@ -34,28 +34,44 @@ function getAttendees(axios, meetupUrlName, eventId) {
   })
 }
 
-let output = {};
+let infoByEvent = {};
+let sessionsByPerson = {};
 
 getEvents(axios, meetupUrlName, eventName).then(events => {
   return Promise.all(events.map(event => {
-    output[event.id] = {
+    infoByEvent[event.id] = {
       eventData: event,
       attendeeNames: [],
     };
     let attendeePromise = getAttendees(axios, meetupUrlName, event.id);
     attendeePromise.then(attendees => {
       attendees.forEach(attendee => {
-        output[event.id].attendeeNames.push(attendee);
+        infoByEvent[event.id].attendeeNames.push(attendee);
+        if (!sessionsByPerson.hasOwnProperty(attendee)) {
+          sessionsByPerson[attendee] = [];
+        }
+        sessionsByPerson[attendee].push(event.local_date);
       });
     });
     return attendeePromise;
   }));
 }).then(() => {
-  Object.keys(output).forEach(function (key) {
-    let info = output[key];
+  console.log(`Session info by event`);
+  Object.keys(infoByEvent).forEach(function (key) {
+    let info = infoByEvent[key];
     let date = info.eventData.local_date;
     let attendeeCount = info.attendeeNames.length;
     let attendees = info.attendeeNames.join(", ");
     console.log(`${dateFormat(date, "d mmm")}: ${18 - attendeeCount} spaces left - (${attendees})`);
+  });
+
+  console.log(`\nSession count by person`);
+  let attendees = Object.keys(sessionsByPerson);
+  attendees.sort(function (a, b) {
+    return sessionsByPerson[b].length - sessionsByPerson[a].length;
+  });
+  attendees.forEach(function (attendee) {
+    let sessions = sessionsByPerson[attendee];
+    console.log(`${attendee}: ${sessions.length}`);
   });
 });
