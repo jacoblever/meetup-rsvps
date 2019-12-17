@@ -5,6 +5,7 @@ const dateFormat = require('dateformat');
 
 const meetupUrlName = "Silicon-Throwabout";
 const eventName = "Tuesday Indoors (Ultimate Frisbee)";
+const eventsAfter = "2020-01-01";
 
 function getEvents(axios, meetupUrlName, eventName) {
   return axios({
@@ -13,7 +14,7 @@ function getEvents(axios, meetupUrlName, eventName) {
     headers: { 'Accept': 'application/json' },
   }).then(response => {
     return response.data.filter(e => {
-      return e.name === eventName;
+      return e.name === eventName && dateFormat(e.local_date, "yyyy-mm-dd") > eventsAfter;
     });
   }).catch(err => {
     console.log(err);
@@ -43,6 +44,7 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
       eventData: event,
       attendeeNames: [],
     };
+
     let attendeePromise = getAttendees(axios, meetupUrlName, event.id);
     attendeePromise.then(attendees => {
       attendees.forEach(attendee => {
