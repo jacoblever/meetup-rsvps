@@ -76,4 +76,35 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
     let sessions = sessionsByPerson[attendee];
     console.log(`${attendee}: ${sessions.length}`);
   });
+
+  let people = Object.keys(sessionsByPerson).sort();
+  
+  let matrixRows = [];
+
+  let linkRow = ["https://tinyurl.com/SiThrowabout"];
+  let dateRow = [""];
+  let costRow = [""];
+  Object.keys(infoByEvent).forEach(key => {
+    let date = infoByEvent[key].eventData.local_date;
+    linkRow.push(infoByEvent[key].eventData.link);
+    dateRow.push(dateFormat(date, "d mmm"));
+    costRow.push(5);
+  });
+  matrixRows.push(linkRow);
+  matrixRows.push(dateRow);
+  matrixRows.push(costRow);
+
+  people.forEach(person => {
+    let row = [person];
+    Object.keys(infoByEvent).forEach(key => {
+      let value = infoByEvent[key].attendeeNames.some(x => x == person) ? 'y' : 'n';
+      row.push(value);
+    });
+    matrixRows.push(row);
+  });
+
+  console.log(`\nTable for google sheet`);
+  matrixRows.forEach(row => {
+    console.log(row.join(","))
+  });
 });
