@@ -21,6 +21,10 @@ function getEvents(axios, meetupUrlName, eventName) {
   })
 }
 
+function printLine() {
+  console.log(`\n------------------------------------------------------------------------------`);
+}
+
 function getAttendees(axios, meetupUrlName, eventId) {
   return axios({
     method: 'get',
@@ -58,6 +62,7 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
     return attendeePromise;
   }));
 }).then(() => {
+  printLine();
   console.log(`Session info by event`);
   Object.keys(infoByEvent).forEach(function (key) {
     let info = infoByEvent[key];
@@ -67,7 +72,18 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
     console.log(`${dateFormat(date, "d mmm")}: ${18 - attendeeCount} spaces left - (${attendees})`);
   });
 
-  console.log(`\nSession count by person`);
+  printLine();
+  console.log(`Session links by event`);
+  Object.keys(infoByEvent).forEach(function (key) {
+    let info = infoByEvent[key];
+    let date = info.eventData.local_date;
+    let attendeeCount = info.attendeeNames.length;
+    let attendees = info.attendeeNames.join(", ");
+    console.log(`- ${dateFormat(date, "d mmm")}: ${info.eventData.link}`);
+  });
+
+  printLine();
+  console.log(`Session count by person`);
   let attendees = Object.keys(sessionsByPerson);
   attendees.sort(function (a, b) {
     return sessionsByPerson[b].length - sessionsByPerson[a].length;
@@ -103,7 +119,8 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
     matrixRows.push(row);
   });
 
-  console.log(`\nTable for google sheet`);
+  printLine();
+  console.log(`Table for google sheet`);
   matrixRows.forEach(row => {
     console.log(row.join(","))
   });
