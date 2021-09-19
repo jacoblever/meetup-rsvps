@@ -4,8 +4,8 @@ const axios = require('axios')
 const dateFormat = require('dateformat');
 
 const meetupUrlName = "Silicon-Throwabout";
-const eventName = "Tuesday Indoors (Ultimate Frisbee)";
-const eventsAfter = "2020-01-01";
+const eventName = "Indoor Ultimate Frisbee in *Hackney Community College* on Thursday evenings";
+const eventsAfter = "2021-09-01";
 
 function getEvents(axios, meetupUrlName, eventName) {
   return axios({
