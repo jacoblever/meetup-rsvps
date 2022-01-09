@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-const axios = require('axios')
-const dateFormat = require('dateformat');
+import axios from 'axios';
+import dateFormat from 'dateformat';
 
 const meetupUrlName = "Silicon-Throwabout";
 const eventName = "Indoor Ultimate Frisbee in *Hackney Community College* on Thursday evenings";
 const eventsDateRange = {from: "2021-09-01T00:00:00.000", to: "2022-05-01T00:00:00.000"};
 
-function getEvents(axios, meetupUrlName, eventName) {
+function getEvents(meetupUrlName, eventName) {
   return axios({
     method: 'get',
     url: `https://api.meetup.com/${meetupUrlName}/events?no_earlier_than=${eventsDateRange.from}&no_later_than=${eventsDateRange.to}&status=past,upcoming`,
@@ -25,7 +25,7 @@ function printLine() {
   console.log(`\n------------------------------------------------------------------------------`);
 }
 
-function updateEventAttendees(eventInfo, updatingExistingData) {
+function updateEventAttendees(eventInfo, updatingExistingData: boolean): boolean {
   if (!updatingExistingData) {
     return true;
   }
@@ -42,7 +42,7 @@ function eventDataFormatted(eventInfo) {
 
 let namesByMemberId = {};
 
-function getRsvps(axios, meetupUrlName, eventId) {
+function getRsvps(meetupUrlName, eventId) {
   return axios({
     method: 'get',
     url: `https://api.meetup.com/${meetupUrlName}/events/${eventId}/rsvps`,
@@ -65,7 +65,7 @@ function getRsvps(axios, meetupUrlName, eventId) {
 let infoByEvent = {};
 let sessionsByPerson = {};
 
-getEvents(axios, meetupUrlName, eventName).then(events => {
+getEvents(meetupUrlName, eventName).then(events => {
   return Promise.all(events.map(event => {
     infoByEvent[event.id] = {
       eventData: event,
@@ -74,7 +74,7 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
       attendees: [],
     };
 
-    let attendeePromise = getRsvps(axios, meetupUrlName, event.id);
+    let attendeePromise = getRsvps(meetupUrlName, event.id);
     attendeePromise.then(attendees => {
       attendees.forEach(attendee => {
         infoByEvent[event.id].attendeeNames.push(attendee.name);
