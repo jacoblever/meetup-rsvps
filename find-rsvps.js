@@ -5,7 +5,7 @@ const dateFormat = require('dateformat');
 
 const meetupUrlName = "Silicon-Throwabout";
 const eventName = "Indoor Ultimate Frisbee in *Hackney Community College* on Thursday evenings";
-const eventsDateRange = {from: "2021-09-01T00:00:00.000", to: "2022-01-01T00:00:00.000"};
+const eventsDateRange = {from: "2021-09-01T00:00:00.000", to: "2022-05-01T00:00:00.000"};
 
 function getEvents(axios, meetupUrlName, eventName) {
   return axios({
@@ -25,8 +25,11 @@ function printLine() {
   console.log(`\n------------------------------------------------------------------------------`);
 }
 
-function updateEventAttendees(eventInfo) {
-  if (process.argv[3] && eventDataFormatted(eventInfo) == process.argv[3]) {
+function updateEventAttendees(eventInfo, updatingExistingData) {
+  if (!updatingExistingData) {
+    return true;
+  }
+  if (process.argv[3] && process.argv[3].split(",").map(x => x.trim()).includes(eventDataFormatted(eventInfo))) {
     return true;
   }
   return eventInfo.eventData.status === "upcoming";
@@ -34,18 +37,26 @@ function updateEventAttendees(eventInfo) {
 
 function eventDataFormatted(eventInfo) {
   let date = eventInfo.eventData.local_date;
-  return dateFormat(date, "d mmm");
+  return dateFormat(date, "dd/mm/yy");
 }
 
-function getAttendees(axios, meetupUrlName, eventId) {
+let namesByMemberId = {};
+
+function getRsvps(axios, meetupUrlName, eventId) {
   return axios({
     method: 'get',
     url: `https://api.meetup.com/${meetupUrlName}/events/${eventId}/rsvps`,
     headers: { 'Accept': 'application/json' },
   }).then(response => {
     return response.data
-      .filter(element => element.response === "yes")
-      .map(element => element.member.name);
+        .filter(element => element.response === "yes")
+        .map(element => {
+          namesByMemberId[element.member.id] = element.member.name;
+          return {
+            name: element.member.name,
+            id: element.member.id,
+          };
+        });
   }).catch(err => {
     console.log(err);
   })
@@ -59,16 +70,20 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
     infoByEvent[event.id] = {
       eventData: event,
       attendeeNames: [],
+      attendeeIds: [],
+      attendees: [],
     };
 
-    let attendeePromise = getAttendees(axios, meetupUrlName, event.id);
+    let attendeePromise = getRsvps(axios, meetupUrlName, event.id);
     attendeePromise.then(attendees => {
       attendees.forEach(attendee => {
-        infoByEvent[event.id].attendeeNames.push(attendee);
-        if (!sessionsByPerson.hasOwnProperty(attendee)) {
-          sessionsByPerson[attendee] = [];
+        infoByEvent[event.id].attendeeNames.push(attendee.name);
+        infoByEvent[event.id].attendeeIds.push(attendee.id);
+        infoByEvent[event.id].attendees.push(attendee);
+        if (!sessionsByPerson.hasOwnProperty(attendee.id)) {
+          sessionsByPerson[attendee.id] = [];
         }
-        sessionsByPerson[attendee].push(event.local_date);
+        sessionsByPerson[attendee.id].push(event.local_date);
       });
     });
     return attendeePromise;
@@ -78,7 +93,7 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
   console.log(`Session info by event`);
   Object.keys(infoByEvent).forEach(function (key) {
     let info = infoByEvent[key];
-    let attendeeCount = info.attendeeNames.length;
+    let attendeeCount = info.attendeeIds.length;
     let attendees = info.attendeeNames.join(", ");
     console.log(`${eventDataFormatted(info)}: ${18 - attendeeCount} spaces left - (${attendees})`);
   });
@@ -92,23 +107,26 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
 
   printLine();
   console.log(`Session count by person`);
-  let attendees = Object.keys(sessionsByPerson);
-  attendees.sort(function (a, b) {
+  let attendeeIds = Object.keys(sessionsByPerson).map(x => +x);
+  attendeeIds.sort(function (a, b) {
     return sessionsByPerson[b].length - sessionsByPerson[a].length;
   });
-  attendees.forEach(function (attendee) {
-    let sessions = sessionsByPerson[attendee];
-    console.log(`${attendee}: ${sessions.length} (£${sessions.length * 5})`);
+  attendeeIds.forEach(function (attendeeId) {
+    let sessions = sessionsByPerson[attendeeId];
+    console.log(`${namesByMemberId[attendeeId]} (${attendeeId}): ${sessions.length} (£${sessions.length * 5})`);
   });
 
-  let people = Object.keys(sessionsByPerson).sort();
+  let personIds = Object.keys(sessionsByPerson).map(x => +x);
+  personIds.sort(function (a, b) {
+    return namesByMemberId[a].localeCompare(namesByMemberId[b]);
+  });
   
   let matrixRows = [];
 
-  let linkRow = ["https://tinyurl.com/SiThrowabout"];
-  let dateRow = [""];
+  let linkRow = ["https://tinyurl.com/SiThrowabout", ""];
+  let dateRow = ["", ""];
   Object.keys(infoByEvent).forEach(key => {
-    linkRow.push(infoByEvent[key].eventData.link);
+    linkRow.push(infoByEvent[key].eventData.link + "attendees");
     dateRow.push(eventDataFormatted(infoByEvent[key]));
   });
   matrixRows.push(linkRow);
@@ -116,36 +134,35 @@ getEvents(axios, meetupUrlName, eventName).then(events => {
 
   let existingSheet = null;
   let peopleAlreadyInSheet = [];
+  let updatingExistingData = false;
   if (process.argv[2]) {
     existingSheet = process.argv[2].split("\n").slice(2).map(row => row.split("\t"));
-    peopleAlreadyInSheet = existingSheet.map(row => row[0])
+    peopleAlreadyInSheet = existingSheet.map(row => ({name: row[0], id: +row[1]}));
+    updatingExistingData = true;
   }
 
-  let peopleInMatrix = [];
-
   peopleAlreadyInSheet.forEach((person, i) => {
-    let existingRow = existingSheet[i].slice(1); // remove name cell
-    let row = [person];
+    let existingRow = existingSheet[i].slice(2); // remove name and id cells
+    let row = [person.name, person.id];
     Object.keys(infoByEvent).forEach((key, j) => {
       let eventInfo = infoByEvent[key];
-      let attending = infoByEvent[key].attendeeNames.some(x => x == person);
-      if (updateEventAttendees(eventInfo)) {
-        let wasGoing = existingRow[j] == 'y';
+      let attending = infoByEvent[key].attendeeIds.some(x => x === person.id);
+      if (updateEventAttendees(eventInfo, updatingExistingData)) {
+        let wasGoing = existingRow[j] === 'y' || existingRow[j] === 'd';
         row.push(attending ? 'y' : (wasGoing ? 'd' : 'n'));
       } else {
         row.push(existingRow[j]);
       }
     });
     matrixRows.push(row);
-    peopleInMatrix.push(person);
   });
 
-  people.filter(x => !peopleAlreadyInSheet.includes(x)).forEach(person => {
-    let row = [person];
+  personIds.filter(x => !peopleAlreadyInSheet.map(x => x.id).includes(x)).forEach(personId => {
+    let row = [namesByMemberId[personId], personId];
     Object.keys(infoByEvent).forEach(key => {
       let eventInfo = infoByEvent[key];
-      let attending = infoByEvent[key].attendeeNames.some(x => x == person);
-      if (updateEventAttendees(eventInfo)) {
+      let attending = infoByEvent[key].attendeeIds.some(x => x === personId);
+      if (updateEventAttendees(eventInfo, updatingExistingData)) {
         row.push(attending ? 'y' : 'n');
       } else {
         row.push(attending ? 'y (dup)' : '');
